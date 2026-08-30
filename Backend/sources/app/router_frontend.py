@@ -1,4 +1,4 @@
-﻿"""
+"""
 router_frontend.py â€” Frontend-facing REST adapter
 ==================================================
 Bridges the ISRO Ground Station React frontend (which expects a rich
@@ -45,8 +45,8 @@ _shared_drift_model = DriftModel()
 VEHICLE_CATALOGUE = [
     {
         "id": "lvm3",
-        "name": "LVM3 (Heavy Payload Bus - 450 Components)",
-        "component_count": 450,
+        "name": "LVM3 (Heavy Payload Bus - 45 Components)",
+        "component_count": 45,
         "max_iddq_uA": 55.0,
         "wind_shear_cap_knots": 45,
         "emi_limit_db": -80,
@@ -54,8 +54,8 @@ VEHICLE_CATALOGUE = [
     },
     {
         "id": "pslv",
-        "name": "PSLV-C58 (Polar Orbit - 310 Components)",
-        "component_count": 310,
+        "name": "PSLV-C58 (Polar Orbit - 38 Components)",
+        "component_count": 38,
         "max_iddq_uA": 48.0,
         "wind_shear_cap_knots": 38,
         "emi_limit_db": -75,
@@ -63,8 +63,8 @@ VEHICLE_CATALOGUE = [
     },
     {
         "id": "gslv",
-        "name": "GSLV Mk III (GEO Bus - 380 Components)",
-        "component_count": 380,
+        "name": "GSLV Mk III (GEO Bus - 42 Components)",
+        "component_count": 42,
         "max_iddq_uA": 52.0,
         "wind_shear_cap_knots": 42,
         "emi_limit_db": -78,
