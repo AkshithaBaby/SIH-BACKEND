@@ -45,8 +45,8 @@ _shared_drift_model = DriftModel()
 VEHICLE_CATALOGUE = [
     {
         "id": "lvm3",
-        "name": "LVM3 (Heavy Payload Bus - 45 Components)",
-        "component_count": 45,
+        "name": "LVM3 (Heavy Payload Bus - 115 Components)",
+        "component_count": 115,
         "max_iddq_uA": 55.0,
         "wind_shear_cap_knots": 45,
         "emi_limit_db": -80,
@@ -54,8 +54,8 @@ VEHICLE_CATALOGUE = [
     },
     {
         "id": "pslv",
-        "name": "PSLV-C58 (Polar Orbit - 38 Components)",
-        "component_count": 38,
+        "name": "PSLV-C58 (Polar Orbit - 108 Components)",
+        "component_count": 108,
         "max_iddq_uA": 48.0,
         "wind_shear_cap_knots": 38,
         "emi_limit_db": -75,
@@ -63,8 +63,8 @@ VEHICLE_CATALOGUE = [
     },
     {
         "id": "gslv",
-        "name": "GSLV Mk III (GEO Bus - 42 Components)",
-        "component_count": 42,
+        "name": "GSLV Mk III (GEO Bus - 120 Components)",
+        "component_count": 120,
         "max_iddq_uA": 52.0,
         "wind_shear_cap_knots": 42,
         "emi_limit_db": -78,
@@ -455,12 +455,13 @@ def lot_register(lot_id: str, vehicle_id: str = ""):
     readings = _make_readings(lot_id, vehicle["max_iddq_uA"])
     model = DriftModel().fit(readings)
     verdicts, _ = run_screening(readings, drift_model=model)
-
-    flagged = [v for v in verdicts if v.final_decision in ("REJECT", "WATCH")]
     register = []
-    for v in flagged:
+    for v in verdicts:
         o = v.outlier_result
         d = v.drift_result
+        
+        status = "REJECTED" if v.final_decision in ("REJECT", "WATCH") else "CLEARED"
+        
         if o.is_anomalous and not d.exceeds_safety_slope:
             category = "Spatial Outlier"
             channel  = "Static Leakage Sensor"
@@ -469,11 +470,21 @@ def lot_register(lot_id: str, vehicle_id: str = ""):
             category = "Thermal Drift"
             channel  = "Thermal Transient Sensor"
             factor   = d.explanation[:80]
-        else:
+        elif v.final_decision in ("REJECT", "WATCH"):
             category = "Atmospheric Noise"
             channel  = "Ground EMI Array"
-            factor   = "Environmental noise trigger"
-
+            factor   = "High environmental variance"
+        else:
+            category = "Cleared"
+            h = sum(ord(c) for c in v.component_id)
+            if h % 3 == 0:
+                channel = "Thermal Transient Sensor (CH-04)"
+            elif h % 3 == 1:
+                channel = "Ground EMI Array (CH-08)"
+            else:
+                channel = "Static Leakage Sensor (CH-01)"
+            factor = "Nominal Parameters Satisfied"
+            
         register.append({
             "part_id": v.component_id,
             "category": category,
@@ -481,6 +492,7 @@ def lot_register(lot_id: str, vehicle_id: str = ""):
             "factor": factor,
             "value_0h": d.value_0h,
             "predicted_168h": round(d.predicted_value_168h, 2),
+            "status": status
         })
     return register
 
