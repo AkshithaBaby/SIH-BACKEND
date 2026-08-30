@@ -329,10 +329,18 @@ def vehicle_profiles():
 
 
 # ---------------------------------------------------------------------------
-# Lot helpers (run the real ML engines)
+# ML result cache — keyed by (lot_id, number_of_rows)
+# Invalidated automatically when new data is injected (row count changes)
 # ---------------------------------------------------------------------------
+_RESULT_CACHE: Dict[str, dict] = {}
 
 def _run_lot(lot_id: str, vehicle: dict):
+    rows = _SEED_DATA.get(lot_id, [])
+    cache_key = f"{lot_id}:{len(rows)}"
+
+    if cache_key in _RESULT_CACHE:
+        return _RESULT_CACHE[cache_key]
+
     readings = _make_readings(lot_id, vehicle["max_iddq_uA"])
     if not readings:
         raise HTTPException(status_code=404, detail=f"No data for lot {lot_id}")
@@ -340,7 +348,10 @@ def _run_lot(lot_id: str, vehicle: dict):
     # Fit drift model on this lot's labelled data (value_168h known)
     model = DriftModel().fit(readings)
     verdicts, metrics = run_screening(readings, drift_model=model)
-    return readings, verdicts, metrics
+    result = (readings, verdicts, metrics)
+
+    _RESULT_CACHE[cache_key] = result
+    return result
 
 
 @router.get("/lots/{lot_id}/summary")

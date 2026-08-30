@@ -35,10 +35,25 @@ from app.module_b_drift import DriftModel
 from app.pipeline import run_screening
 from app.router_frontend import router as frontend_router
 
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Pre-warm the ML result cache for all vehicles on startup."""
+    try:
+        from app.router_frontend import VEHICLE_CATALOGUE, _vehicle_by_lot, _run_lot
+        for vehicle in VEHICLE_CATALOGUE:
+            _run_lot(vehicle["lot_id"], vehicle)
+        print(f"[startup] ML cache warmed for {len(VEHICLE_CATALOGUE)} vehicles ✓")
+    except Exception as e:
+        print(f"[startup] Cache warm-up failed (non-fatal): {e}")
+    yield  # app runs
+
 app = FastAPI(
     title="Predictive ESS Screening Backend",
     description="Dynamic outlier detection + drift prediction for burn-in latent defect screening.",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 # Register the frontend-facing REST adapter (all /api/* routes)
