@@ -1,5 +1,5 @@
-"""
-router_frontend.py — Frontend-facing REST adapter
+﻿"""
+router_frontend.py â€” Frontend-facing REST adapter
 ==================================================
 Bridges the ISRO Ground Station React frontend (which expects a rich
 REST API) to the ML engine (Module A + Module B) that actually runs
@@ -32,13 +32,13 @@ from app.schemas import ParameterReading
 router = APIRouter(prefix="/api", tags=["frontend"])
 
 # ---------------------------------------------------------------------------
-# Shared drift model — fit once on startup with the seeded data
+# Shared drift model â€” fit once on startup with the seeded data
 # ---------------------------------------------------------------------------
 _shared_drift_model = DriftModel()
 
 # ---------------------------------------------------------------------------
 # Seeded component readings for each vehicle / lot.
-# These are realistic Iddq values (µA) for CMOS ICs at burn-in temp 125 °C.
+# These are realistic Iddq values (ÂµA) for CMOS ICs at burn-in temp 125 Â°C.
 # datasheet_max mirrors the vehicle's max_iddq_uA spec.
 # ---------------------------------------------------------------------------
 
@@ -128,6 +128,30 @@ _SEED_DATA: Dict[str, List[list]] = {
         ["PART_G08", 19.8, 20.1, 20.3, 20.5],
     ],
 }
+
+import random
+
+def _populate_missing_seeds():
+    for vehicle in VEHICLE_CATALOGUE:
+        lot_id = vehicle["lot_id"]
+        target = vehicle["component_count"]
+        current_rows = _SEED_DATA.get(lot_id, [])
+        missing = target - len(current_rows)
+        
+        if missing > 0:
+            # Sort current row IDs so we can pick up numbering
+            for i in range(missing):
+                cid = f"PART_GEN_{len(current_rows) + 1:03d}"
+                v0 = round(random.uniform(8.0, 25.0), 1)
+                v24 = round(v0 + random.uniform(0.0, 1.0), 1)
+                v96 = round(v24 + random.uniform(0.0, 1.0), 1)
+                v168 = round(v96 + random.uniform(0.0, 1.0), 1)
+                
+                current_rows.append([cid, v0, v24, v96, v168])
+                
+            _SEED_DATA[lot_id] = current_rows
+
+_populate_missing_seeds()
 
 def _make_readings(lot_id: str, datasheet_max: float) -> List[ParameterReading]:
     rows = _SEED_DATA.get(lot_id, [])
@@ -266,7 +290,7 @@ def lot_module_a(lot_id: str, vehicle_id: str = ""):
     import numpy as np
     all_values = [r.value_0h for r in readings]
     median = float(np.median(all_values))
-    dynamic_limit = median * 3.0   # approx 3× lot median as dynamic threshold
+    dynamic_limit = median * 3.0   # approx 3Ã— lot median as dynamic threshold
 
     points = [
         {
@@ -382,12 +406,12 @@ def part_inspection(part_id: str):
 
                 if o.is_anomalous and not d.exceeds_safety_slope:
                     status   = "HARDWARE REJECT" if decision == "REJECT" else "HARDWARE WATCH"
-                    category = "Spatial Outlier — Hardware Defect"
+                    category = "Spatial Outlier â€” Hardware Defect"
                     channel  = "Static Leakage Current Sensor Array"
                     physical = o.explanation
                 elif d.exceeds_safety_slope:
-                    status   = "THERMAL DRIFT REJECT" if decision == "REJECT" else "THERMAL DRIFT — MONITOR"
-                    category = "Thermal Drift — Exceeds Safety Slope"
+                    status   = "THERMAL DRIFT REJECT" if decision == "REJECT" else "THERMAL DRIFT â€” MONITOR"
+                    category = "Thermal Drift â€” Exceeds Safety Slope"
                     channel  = "Thermal Transient Sensor"
                     physical = d.explanation
                 else:
@@ -408,9 +432,9 @@ def part_inspection(part_id: str):
                 ]
 
                 verdict_str = (
-                    "REJECT — Do Not Fly" if decision == "REJECT"
-                    else "MONITOR — Re-screen Recommended" if decision == "WATCH"
-                    else "PASS — Cleared for Integration"
+                    "REJECT â€” Do Not Fly" if decision == "REJECT"
+                    else "MONITOR â€” Re-screen Recommended" if decision == "WATCH"
+                    else "PASS â€” Cleared for Integration"
                 )
 
                 return {
@@ -452,3 +476,4 @@ def metrics(vehicle_id: str = "lvm3"):
         "drift_mae_uA": round(ml_metrics.mae_168h or 1.8, 2),
         "anomaly_recall": recall,
     }
+
