@@ -200,6 +200,101 @@ def inject_telemetry(vehicle_id: str, payload: dict):
     return {"status": "ok", "message": f"Injected {cid} into {lot_id}"}
 
 
+# ---------------------------------------------------------------------------
+# Bulk inject  (CSV batch upload from frontend)
+# ---------------------------------------------------------------------------
+
+@router.post("/lots/{vehicle_id}/inject-bulk")
+def inject_bulk(vehicle_id: str, payload: dict):
+    """Accept a list of readings: {"rows": [{"part_id":..,"value_0h":..,"value_24h":..}, ...]}"""
+    lot_id = _lot_id_for_vehicle(vehicle_id)
+    if not lot_id:
+        raise HTTPException(status_code=404, detail="Vehicle not found.")
+
+    rows = payload.get("rows", [])
+    if not rows or not isinstance(rows, list):
+        raise HTTPException(status_code=400, detail="Provide a non-empty 'rows' list.")
+
+    if lot_id not in _SEED_DATA:
+        _SEED_DATA[lot_id] = []
+
+    injected = 0
+    for r in rows:
+        try:
+            v0  = float(r.get("value_0h",  0.0))
+            v24 = float(r.get("value_24h", 0.0))
+            v96 = float(r.get("value_96h",  v24))
+            v168 = float(r.get("value_168h", v24))
+            cid = str(r.get("part_id", f"BULK_{injected+1:04d}"))
+            _SEED_DATA[lot_id].append([cid, v0, v24, v96, v168])
+            injected += 1
+        except (ValueError, TypeError):
+            continue  # skip malformed rows silently
+
+    return {"status": "ok", "injected": injected, "lot_id": lot_id}
+
+
+# ---------------------------------------------------------------------------
+# CSV Export — full raw dataset for a lot
+# ---------------------------------------------------------------------------
+
+from fastapi.responses import PlainTextResponse
+
+@router.get("/lots/{lot_id}/export", response_class=PlainTextResponse)
+def export_lot_csv(lot_id: str):
+    """Return all seed data for a lot as a downloadable CSV."""
+    rows = _SEED_DATA.get(lot_id)
+    if rows is None:
+        raise HTTPException(status_code=404, detail=f"Lot '{lot_id}' not found.")
+
+    lines = ["part_id,value_0h,value_24h,value_96h,value_168h"]
+    for row in rows:
+        cid, v0, v24, v96, v168 = row[0], row[1], row[2], row[3], row[4]
+        lines.append(f"{cid},{v0},{v24},{v96},{v168}")
+
+    csv_text = "\n".join(lines)
+    headers = {
+        "Content-Disposition": f'attachment; filename="{lot_id}_telemetry.csv"',
+        "Content-Type": "text/csv",
+    }
+    return PlainTextResponse(content=csv_text, headers=headers)
+
+
+# ---------------------------------------------------------------------------
+# ML Engine toggle — manual on/off switch
+# ---------------------------------------------------------------------------
+
+_ENGINE_ENABLED: bool = True
+
+_ENGINE_INFO = {
+    "module_a": {
+        "name": "Dynamic Spatial Outlier Vector",
+        "algorithm": "Modified Z-Score (Iglewicz & Hoaglin) + Robust MAD",
+        "threshold": 3.5,
+    },
+    "module_b": {
+        "name": "Time-Series Drift Predictor",
+        "algorithm": "Physics-informed Linear Baseline + RandomForestRegressor residual correction",
+        "features": ["value_0h", "value_24h", "early_drift_rate"],
+    },
+}
+
+@router.get("/engine/status")
+def engine_status():
+    return {
+        "enabled": _ENGINE_ENABLED,
+        "engines": _ENGINE_INFO,
+    }
+
+@router.post("/engine/toggle")
+def engine_toggle():
+    global _ENGINE_ENABLED
+    _ENGINE_ENABLED = not _ENGINE_ENABLED
+    return {
+        "enabled": _ENGINE_ENABLED,
+        "message": "ML Engine RESUMED" if _ENGINE_ENABLED else "ML Engine PAUSED",
+        "engines": _ENGINE_INFO,
+    }
 
 # ---------------------------------------------------------------------------
 # Auth
