@@ -33,12 +33,17 @@ from app.schemas import (
 from app.module_a_outlier import detect_outliers
 from app.module_b_drift import DriftModel
 from app.pipeline import run_screening
+from app.router_frontend import router as frontend_router
 
 app = FastAPI(
     title="Predictive ESS Screening Backend",
     description="Dynamic outlier detection + drift prediction for burn-in latent defect screening.",
     version="0.1.0",
 )
+
+# Register the frontend-facing REST adapter (all /api/* routes)
+app.include_router(frontend_router)
+
 
 # ---------------------------------------------------------------------------
 # CORS — allow the Vercel frontend (and localhost dev) to call this API.
