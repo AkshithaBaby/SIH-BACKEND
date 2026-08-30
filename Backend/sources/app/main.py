@@ -16,7 +16,9 @@ Endpoints:
 """
 from __future__ import annotations
 
+import os
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from typing import List
 
 from app.schemas import (
@@ -36,6 +38,19 @@ app = FastAPI(
     title="Predictive ESS Screening Backend",
     description="Dynamic outlier detection + drift prediction for burn-in latent defect screening.",
     version="0.1.0",
+)
+
+# ---------------------------------------------------------------------------
+# CORS — allow the Vercel frontend (and localhost dev) to call this API.
+# For production, replace "*" with your actual Vercel URL, e.g.:
+#   "https://sih-frontend.vercel.app"
+# ---------------------------------------------------------------------------
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],          # tighten this after you get the Vercel URL
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # In-memory model instance. For the hackathon this is fine; for production
